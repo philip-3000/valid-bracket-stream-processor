@@ -8,18 +8,25 @@ import (
 	"syscall"
 )
 
-func generateValidStream(stream chan<- byte, size int, wg *sync.WaitGroup) int64 {
+/*
+Writes [{....}] to the channel, where the number of repeated terms is
+specifed by the count parameter.
+*/
+func generateValidStream(stream chan<- byte, count int, wg *sync.WaitGroup) int64 {
 	var totalSize int64 = 0
-	for i := 0; i < size; i++ {
-		wg.Add(1)
+	for i := 0; i < count; i++ {
+		wg.Add(3)
 		stream <- '['
-		totalSize += 1
+		stream <- '{'
+		stream <- 'a'
+		totalSize += 3
 	}
 
-	for i := 0; i < size; i++ {
-		wg.Add(1)
+	for i := 0; i < count; i++ {
+		wg.Add(2)
+		stream <- '}'
 		stream <- ']'
-		totalSize += 1
+		totalSize += 2
 	}
 	return totalSize
 }
@@ -47,11 +54,11 @@ func generateInsufficientOpenBrackets(stream chan<- byte, size int, wg *sync.Wai
 
 func main() {
 	fmt.Println("Running a few tests:")
-	fmt.Println("\t * Generate a valid bracket stream of 2 characters")
-	fmt.Println("\t * Generate a valid bracket stream of 1MB of characters")
+	fmt.Println("\t * Generate a small valid bracket stream")
+	fmt.Println("\t * Generate a valid bracket stream of > 1MB of characters")
 	fmt.Println("\t * Generate an invalid bracket stream of not enough open brackets")
-	fmt.Println("\t * Generate a valid bracket stream of 2K of characters")
-	fmt.Println("\t * Generate a valid bracket stream of 256MB of characters")
+	fmt.Println("\t * Generate another small valid bracket stream")
+	fmt.Println("\t * Generate a larger valid bracket stream over 256MB of characters")
 
 	// control - c to exit.
 	done := make(chan os.Signal, 1)
@@ -80,17 +87,29 @@ func main() {
 		// and buffer the reads/writes in blocks.
 		readBuffer := make([]byte, 1)
 
+		// map to map our opening brace to closing brace
+		var openToCloseMap = map[byte]byte{'{': '}', '[': ']', '(': ')'}
+		var closeToOpenMap = map[byte]byte{'}': '{', ']': '[', ')': '('}
+
 		// byte offset to keep track
 		var offset int64 = 0
 		var totalSize int64 = 0
 		for {
-
 			select {
 			case character, ok := <-bracketStream:
 				if ok {
-					// check the bracket.  if it's an open bracket '['
-					// then write it out to our stream
-					if character == '[' {
+					// check the character
+					matchingOpenBracket, foundClosingBracket := closeToOpenMap[character]
+					_, foundOpenBracket := openToCloseMap[character]
+
+					// nothing to do if it's not an open or close bracket.
+					if !(foundClosingBracket || foundOpenBracket) {
+						wg.Done()
+						continue
+					}
+
+					if foundOpenBracket {
+						// write out open brackets.
 						_, err := writeFile.WriteAt([]byte{character}, offset)
 						if err != nil {
 							fmt.Printf("Error occurred: %s", err.Error())
@@ -104,39 +123,41 @@ func main() {
 						continue
 					}
 
-					// if it's a closed bracket, we need to check the one that came before it.
-					// now this is a bit contrived since we're only check one type of bracket.
-					if character == ']' {
-						totalSize += 1
-						// check the offset...
-						if offset < 1 {
-							fmt.Printf("*****Invalid Stream: Exhausted offset - cannot read anymore open brackets from stream.\n")
-							totalSize = 0
-							wg.Done()
-							continue
-						}
-						offset -= 1
-						writeFile.ReadAt(readBuffer, offset)
+					// at this point must be a closing bracket, we need to check the one that
+					// came before it matches up.
+					totalSize += 1
 
-						// don't quite have to check this since it's all we were putting on for
-						// our example...
-						if readBuffer[0] != '[' {
-							fmt.Printf("*****Found invalid character '%c' - stream not valid so far. Resetting offset.\n", readBuffer[0])
-							offset = 0
-							totalSize = 0
-							wg.Done()
-							continue
-						}
-
-						// ok, matching open bracket. check offset. if it's at 0, we've successfully found a valid stream
-						if offset == 0 {
-							fmt.Printf("*****Found a valid bracket stream! Total Size = %d\n", totalSize)
-							totalSize = 0
-						}
+					// check the offset...
+					if offset < 1 {
+						fmt.Printf("*****Invalid Stream: Exhausted offset - cannot read anymore open brackets from stream.\n")
+						totalSize = 0
 						wg.Done()
+						continue
 					}
 
-					// anything else ignore it for now.
+					// offset ok.  read the last bracket.
+					offset -= 1
+					writeFile.ReadAt(readBuffer, offset)
+
+					// don't quite have to check this since it's all we were putting on for
+					// our example...
+					if readBuffer[0] != matchingOpenBracket {
+						fmt.Printf("*****Found invalid character '%c' but expected '%c' - stream not valid so far. Resetting offset.\n", readBuffer[0], matchingOpenBracket)
+						offset = 0
+						totalSize = 0
+						wg.Done()
+						continue
+					}
+
+					// ok, matching open bracket. check offset. if it's at 0, we've successfully found a valid stream
+					if offset == 0 {
+						fmt.Printf("*****Found a valid bracket stream! Total bracket count = %d\n", totalSize)
+
+						totalSize = 0
+						wg.Done()
+						continue
+					}
+					wg.Done()
 				}
 
 			}
@@ -159,7 +180,7 @@ func main() {
 		wg.Wait()
 
 		fmt.Printf("Fifth test...\n")
-		generateValidStream(bracketStream, 128*1024*1024, &wg)
+		generateValidStream(bracketStream, 32*1024*1024, &wg)
 		wg.Wait()
 
 		fmt.Printf("\nTests Complete.  Control-C to quit.\n")
