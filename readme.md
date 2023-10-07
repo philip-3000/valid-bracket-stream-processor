@@ -1,7 +1,7 @@
 # Overview
 This code is an attempt to solve the valid paranthesis problem, but, in this case, for a stream rather than a string:
 
-> Given a stream of characters consisting of brackets open brackes '(', '{', '[' and corresponding closing brackets']', determine if/at which point the stream has produced a valid sequence of open and close brackets or not. The size of the data stream is not known ahead of time.
+> Given a stream of characters consisting of brackets open brackes '(', '{', '[' and corresponding closing brackets ')', '}', and ']', respectively, determine if/at which point the stream has produced a valid sequence of open and close brackets or not. The size of the data stream is not known ahead of time.
 
 For example, consider the following stream of brackets:
 
