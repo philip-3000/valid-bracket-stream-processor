@@ -25,11 +25,17 @@ Instead of storing the data in memory, perhaps they can be streamed out to a log
 graph LR
     A((Stream generator)) -- brackets--> B(Channel)
     B -- brackets --> C((Bracket Parser))
-    C -- Stream Open Brackets --> D[(File Storage)]
-    D[(File Storage)] -- Read Brackets From Stream --> C
+    C -- Write Open Brackets --> D[(File Storage)]
+    D[(File Storage)] -- Read Brackets --> C
 ```
 
-The stream generator go routine will push brackets over a channel to a stream parser go routine - the parser will append open brackets '[' to the stream and keep an offset into the stream.  When a closing bracket ']' is enclosded, the offset will be used to read the last character back and verify the brackets match. 
+The "stream generator" is a simple go [routine](https://github.com/philip-3000/valid-bracket-stream-processor/blob/87339335a4a718894496c68b5de7561706079a9d/main.go#L146) that will push brackets over a channel to a "stream parser" go [routine](https://github.com/philip-3000/valid-bracket-stream-processor/blob/87339335a4a718894496c68b5de7561706079a9d/main.go#L76). The parser will append open brackets '[' to the stream and keep an offset into the stream.  When a closing bracket ']' comes into the stream, the offset will be used to read the last character back and verify the brackets match. 
+
+The offset is then decremented so we know the next position in the stream to read from. We also can increment a total byte counter to keep track of how but the data stream is.  A few conditions to check:
+
+ * if there's a closing bracket that comes in, but, the offset is 0, we've either not pushed any open brackets on to the stream, or, we've exhausted all of them. This means the stream is not valid.
+ * if the character coming in over the channel to the parser is not an open or close bracket, ignore it.
+ * if we find a match on the bracket and we've read our offset down to 0, we've produced a valid stream.
 
 In this case, we are only limited by the storage capacity on the machine. 
 
