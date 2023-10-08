@@ -27,7 +27,9 @@ Since the stream could be enormous, pulling the data into memory poses a problem
 # Idea 1 - Read and Write brackets to a File Stream
 The first issue that comes to mind is how do we store the incoming data? Since the data can be of an arbitrary size, buffering it all into memory is most likely too risky - what if someone sends us a gigabyte of open brackets? How about 4 gigabytes of open bracket? We can run into potential problems of exhausting memory by storing them on an in memory data structure.
 
-Instead of storing the data in memory, perhaps they can be streamed out to something tried and true: a log file stream. In this case, we aren't limited by RAM and can deal with much larger quantities of data. The overall flow of data looks like the following:
+Instead of storing the data in memory, perhaps they can be streamed out to something tried and true: a log file stream. In this case, we aren't limited by RAM and can deal with much larger quantities of data. A file stream also gives us the benefit of being seekable - that is, after we've written to it, we can also move an offset back from the end of the stream.  
+
+We'll need something to generate our stream of brackets, and something else to process them. The overall flow of data looks like the following:
 
 ```mermaid
 graph LR
