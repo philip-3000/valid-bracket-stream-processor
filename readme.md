@@ -25,7 +25,7 @@ We'll find one valid pair, "[]", however, afterwards, the stream becomes invalid
 Since the stream could be enormous, pulling the data into memory poses a problem.
 
 # Idea 1 - Read and Write brackets to a File Stream
-The first issue that comes to mind is how do we store the data? Since the data can be of an arbitrary size, buffering it all into memory is most likely too risky - what if someone sends us a gigabyte of open brackets? How about 4 gigabytes of open bracket? We can run into potential problems of exhausting memory by storing them on an in memory data structure.
+The first issue that comes to mind is how do we store the incoming data? Since the data can be of an arbitrary size, buffering it all into memory is most likely too risky - what if someone sends us a gigabyte of open brackets? How about 4 gigabytes of open bracket? We can run into potential problems of exhausting memory by storing them on an in memory data structure.
 
 Instead of storing the data in memory, perhaps they can be streamed out to something tried and true: a log file stream. In this case, we aren't limited by RAM and can deal with much larger quantities of data. The overall flow of data looks like the following:
 
@@ -82,3 +82,11 @@ Tests Complete.  Control-C to quit.
 
 The first few test cases will be completed fairly quickly..however the last one will take quite a while. Better go make some coffee...perhaps run errands.
 
+Lessons learned from Take 1:
+ * reading and writing a byte a time works
+ * it's very innefficient. 
+
+# Idea 2 - Buffer Blocks Before Flushing
+Based on the lessons learned in Take 1, what if instead of working on a byte by byte basis, we worked on a block basis, of say 64K bytes or characters. We only flush the block to disk when we no longer have the space to read another open bracket into the buffer. In this case, buffer 1 will get flushed to disk, and we'll now be working with buffer 2, which is in memory. 
+
+---- work in progress ----
